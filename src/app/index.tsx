@@ -1,7 +1,18 @@
-import { Redirect } from "expo-router";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 
 export default function Index() {
-  console.log("INDEX SCREEN");
-  // Automatically route to the login screen on app launch
-  return <Redirect href="/(auth)/login" />;
+  return (
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#4A90E2" />
+    </View>
+  );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F7FA",
+  },
+});
