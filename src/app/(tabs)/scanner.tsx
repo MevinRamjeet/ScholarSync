@@ -1,6 +1,10 @@
+import { decode } from "base64-arraybuffer";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { File } from "expo-file-system";
 import { useRef, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Button,
   Image,
   StyleSheet,
@@ -8,19 +12,20 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { supabase } from "../../services/supabase";
 
 export default function ScannerScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [photoUri, setPhotoUri] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const cameraRef = useRef<any>(null);
 
-  if (!permission) {
+  if (!permission)
     return (
       <View style={styles.container}>
-        <Text style={styles.text}>Loading permissions...</Text>
+        <Text style={styles.text}>Loading...</Text>
       </View>
     );
-  }
 
   if (!permission.granted) {
     return (
@@ -42,24 +47,71 @@ export default function ScannerScreen() {
     }
   };
 
+  const uploadPhoto = async () => {
+    if (!photoUri) return;
+    setUploading(true);
+
+    try {
+      // 1. Get current user
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("No user logged in");
+
+      // 2. Read image as Base64
+      // const base64 = await FileSystem.readAsStringAsync(photoUri, {
+      //   encoding: "base64",
+      // });
+
+      const fileInstance = new File(photoUri);
+      const base64 = await fileInstance.base64();
+
+      // 3. Create a unique file path (User ID / Timestamp)
+      const filePath = `${user.id}/${Date.now()}.jpg`;
+
+      // 4. Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from("notes")
+        .upload(filePath, decode(base64), { contentType: "image/jpeg" });
+
+      if (uploadError) throw uploadError;
+
+      Alert.alert("Success!", "Note saved to your study drive.");
+      setPhotoUri(null); // Reset scanner
+    } catch (error: any) {
+      Alert.alert("Upload Failed", error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (photoUri) {
     return (
       <View style={styles.container}>
         <Image source={{ uri: photoUri }} style={styles.preview} />
-        <Button
-          title="Discard & Scan Again"
-          onPress={() => setPhotoUri(null)}
-        />
+        <View style={styles.actionRow}>
+          <Button
+            title="Discard"
+            onPress={() => setPhotoUri(null)}
+            color="#F44336"
+          />
+          {uploading ? (
+            <ActivityIndicator color="#4A90E2" />
+          ) : (
+            <Button
+              title="Save to Cloud"
+              onPress={uploadPhoto}
+              color="#4CAF50"
+            />
+          )}
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Camera is now a standalone sibling */}
       <CameraView style={styles.camera} facing="back" ref={cameraRef} />
-
-      {/* Overlay rendered on top using absolute positioning */}
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
           <View style={styles.captureInner} />
@@ -74,7 +126,7 @@ const styles = StyleSheet.create({
   text: { textAlign: "center", marginBottom: 20, color: "white" },
   camera: { flex: 1 },
   overlay: {
-    ...StyleSheet.absoluteFill, // Stretches to fill the parent container
+    ...StyleSheet.absoluteFill,
     backgroundColor: "transparent",
     justifyContent: "flex-end",
     alignItems: "center",
@@ -95,4 +147,10 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
   },
   preview: { flex: 1, resizeMode: "contain" },
+  actionRow: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 20,
+    backgroundColor: "#222",
+  },
 });
