@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -14,24 +15,26 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
 
   // Use focus listener to refresh data every time user navigates to this tab
-  useEffect(() => {
-    const fetchPendingTasks = async () => {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("tasks")
-        .select("*")
-        .eq("status", "pending")
-        .order("due_date", { ascending: true })
-        .limit(3); // Only show top 3 on dashboard
+  useFocusEffect(
+    useCallback(() => {
+      const fetchPendingTasks = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("tasks")
+          .select("*")
+          .eq("status", "pending")
+          .order("due_date", { ascending: true })
+          .limit(3); // Only show top 3 on dashboard
 
-      if (!error && data) {
-        setPendingTasks(data);
-      }
-      setLoading(false);
-    };
+        if (!error && data) {
+          setPendingTasks(data);
+        }
+        setLoading(false);
+      };
 
-    fetchPendingTasks();
-  }, []); // Note: in a real app, use useFocusEffect from expo-router to refetch on tab focus
+      fetchPendingTasks();
+    }, []),
+  );
 
   return (
     <View style={styles.container}>
