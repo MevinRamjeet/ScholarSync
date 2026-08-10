@@ -1,12 +1,37 @@
+import * as Notifications from "expo-notifications";
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+
+// 1. Configure foreground notification behavior
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 export default function TimerScreen() {
-  const [secondsLeft, setSecondsLeft] = useState(25 * 60); // 25 minutes
+  // const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [secondsLeft, setSecondsLeft] = useState(5); // for testing
   const [isActive, setIsActive] = useState(false);
 
+  // 2. Request runtime permissions when the screen loads
   useEffect(() => {
-    // Type-safe interval declaration
+    const requestPermissions = async () => {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissions needed",
+          "Enable notifications in your device settings to get break alerts!",
+        );
+      }
+    };
+    requestPermissions();
+  }, []);
+
+  useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
 
     if (isActive) {
@@ -16,11 +41,16 @@ export default function TimerScreen() {
             clearInterval(interval);
             setIsActive(false);
 
-            // Delay alert slightly so the UI can paint "00:00" first
-            setTimeout(
-              () => alert("Focus session complete! Take a break."),
-              10,
-            );
+            // 3. Trigger the local system notification!
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: "Focus Session Complete! 🍅",
+                body: "Great job! Time to take a 5-minute break.",
+                sound: true,
+              },
+              trigger: null, // 'null' means trigger immediately
+            });
+
             return 0;
           }
           return prevSeconds - 1;
@@ -28,15 +58,15 @@ export default function TimerScreen() {
       }, 1000);
     }
 
-    // Cleanup interval on unmount or when isActive changes
     return () => clearInterval(interval);
-  }, [isActive]); // secondsLeft is no longer here!
+  }, [isActive]);
 
   const toggleTimer = () => setIsActive(!isActive);
 
   const resetTimer = () => {
     setIsActive(false);
-    setSecondsLeft(25 * 60);
+    // setSecondsLeft(25 * 60);
+    setSecondsLeft(5); // for testing
   };
 
   const formatTime = (totalSeconds: number) => {
